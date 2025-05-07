@@ -1,0 +1,3 @@
+---
+# Entry point: call our workstation provisioning playbook
+- import_playbook: pytorch_host_setup.yml

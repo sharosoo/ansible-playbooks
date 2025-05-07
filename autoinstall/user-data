@@ -1,0 +1,94 @@
+#cloud-config
+autoinstall:
+  version: 1
+
+  identity:
+    hostname: pytorch-ws
+    username: ubuntu
+    password: "$6$…YOUR_HASH_HERE…"
+
+  keyboard:
+    layout: us
+
+  locale: en_US
+
+  network:
+    version: 2
+    ethernets:
+      eth0:
+        dhcp4: false
+        addresses: [ "192.168.0.105/24" ]
+        gateway4: 192.168.0.1
+        nameservers:
+          addresses: [ "1.1.1.1", "8.8.8.8" ]
+
+  storage:
+    config:
+      # Disk 0 → root + EFI
+      - type: disk
+        id: disk0
+        match:
+          path: /dev/nvme0n1
+        ptable: gpt
+        wipe: superblock-recursive
+      - type: partition
+        id: boot-part
+        device: disk0
+        number: 1
+        size: 550MiB
+        flag: boot
+      - type: partition
+        id: root-part
+        device: disk0
+        number: 2
+        size: -1
+      - type: format
+        id: boot-fs
+        volume: boot-part
+        fstype: fat32
+      - type: mount
+        id: boot-mount
+        device: boot-fs
+        path: /boot/efi
+      - type: format
+        id: root-fs
+        volume: root-part
+        fstype: ext4
+      - type: mount
+        id: root-mount
+        device: root-fs
+        path: /
+
+      # Disk 1 → /data
+      - type: disk
+        id: disk1
+        match:
+          path: /dev/nvme1n1
+        ptable: gpt
+        wipe: superblock-recursive
+      - type: partition
+        id: data-part
+        device: disk1
+        number: 1
+        size: -1
+      - type: format
+        id: data-fs
+        volume: data-part
+        fstype: ext4
+      - type: mount
+        id: data-mount
+        device: data-fs
+        path: /data
+
+  packages:
+    - git
+    - ansible
+    - python3
+    - python3-pip
+    - ubuntu-drivers-common
+
+  late-commands:
+    - curtin in-target --target=/target bash -c "apt-get update && apt-get install -y git ansible python3-pip ubuntu-drivers-common"
+    - curtin in-target --target=/target runuser -l ubuntu -c \
+        "ansible-pull -U https://github.com/sharosoo/ansible-setup.git playbooks/pytorch_host_setup.yml -i localhost, -c local"
+

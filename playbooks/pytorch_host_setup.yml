@@ -1,0 +1,130 @@
+---
+- name: Provision PyTorch/NVIDIA workstation
+  hosts: local
+  become: true
+  vars:
+    driver_version: "470"
+    cuda_version: "11.8.0-1"
+    cuda_compat_pkg: "cuda-compat-11-8"
+    cudart_pkg: "libcudart11-8=11.8.89-1"
+    cublas_pkg: "libcublas-11-8=11.11.3.6-1"
+    cusparse_pkg: "libcusparse-11-7=11.7.5.86-1"
+    npp_pkg:  "libnpp-11-8=11.8.0.86-1"
+    nccl_pkg: "libnccl2=2.15.5-1+cuda11.8"
+    nccl_dev_pkg: "libnccl-dev=2.15.5-1+cuda11.8"
+    ansible_repo: "https://github.com/your-org/ansible-setup.git"
+
+  tasks:
+    - name: Ensure apt supports https transport
+      apt:
+        name: apt-transport-https
+        state: present
+        update_cache: yes
+
+    - name: Add NVIDIA CUDA APT key
+      apt_key:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
+        state: present
+
+    - name: Add NVIDIA CUDA APT repo
+      apt_repository:
+        repo: "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /"
+        state: present
+        filename: nvidia-cuda
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install NVIDIA driver {{ driver_version }}
+      apt:
+        name: "nvidia-driver-{{ driver_version }}"
+        state: present
+
+    - name: Install core CUDA & compatibility packages
+      apt:
+        name:
+          - "cuda-toolkit-11-8={{ cuda_version }}"
+          - "{{ cuda_compat_pkg }}"
+        state: present
+
+    - name: Install specific CUDA runtime dev package
+      apt:
+        name: "{{ cudart_pkg }}"
+        state: present
+
+    - name: Install individual CUDA libs
+      apt:
+        name:
+          - "{{ cublas_pkg }}"
+          - "{{ cusparse_pkg }}"
+          - "{{ npp_pkg }}"
+        state: present
+
+    - name: Install NCCL runtime & dev
+      apt:
+        name:
+          - "{{ nccl_pkg }}"
+          - "{{ nccl_dev_pkg }}"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: latest
+
+    - name: Install NVIDIA Container Toolkit
+      shell: |
+        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+        curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+        curl -fsSL https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list \
+          | tee /etc/apt/sources.list.d/nvidia-docker.list
+        apt-get update && apt-get install -y nvidia-container-toolkit
+      args:
+        warn: false
+
+    - name: Configure Docker daemon for NVIDIA runtime
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "default-runtime": "nvidia",
+            "runtimes": {
+              "nvidia": {
+                "path": "nvidia-container-runtime",
+                "runtimeArgs": []
+              }
+            }
+          }
+      notify: Restart Docker
+
+    - name: Add user '{{ ansible_user_id }}' to docker group
+      user:
+        name: "{{ ansible_user_id }}"
+        groups: docker
+        append: yes
+
+    - name: Install Ansible pull dependencies
+      apt:
+        name:
+          - git
+          - ansible
+          - python3-pip
+          - ubuntu-drivers-common
+        state: present
+
+    - name: Pull & run the full workstation playbook from Git
+      shell: >
+        ansible-pull
+        -U {{ ansible_repo }}
+        playbooks/pytorch_host_setup.yml
+        -i localhost, -c local
+      args:
+        chdir: /home/{{ ansible_user_id }}
+
+  handlers:
+    - name: Restart Docker
+      service:
+        name: docker
+        state: restarted
+
