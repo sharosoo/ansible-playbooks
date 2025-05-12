@@ -3,15 +3,15 @@
   hosts: local
   become: true
   vars:
-    driver_version: "470"
-    cuda_version: "11.8.0-1"
-    cuda_compat_pkg: "cuda-compat-11-8"
-    cudart_pkg: "libcudart11-8=11.8.89-1"
-    cublas_pkg: "libcublas-11-8=11.11.3.6-1"
-    cusparse_pkg: "libcusparse-11-7=11.7.5.86-1"
-    npp_pkg: "libnpp-11-8=11.8.0.86-1"
-    nccl_pkg: "libnccl2=2.15.5-1+cuda11.8"
-    nccl_dev_pkg: "libnccl-dev=2.15.5-1+cuda11.8"
+    driver_version: "575"
+    cuda_version: "12.9.0-1"
+    cuda_compat_pkg: "cuda-compat-12-9"
+    cudart_pkg: "libcudart12-9=12.9.37-1"
+    cublas_pkg: "libcublas-12-9=12.9.0.13-1"
+    cusparse_pkg: "libcusparse-12-9=12.5.9.5-1"
+    npp_pkg: "libnpp-12-9=12.4.0.27-1"
+    nccl_pkg: "libnccl2=2.26.5-1+cuda12.9"
+    nccl_dev_pkg: "libnccl-dev=2.26.5-1+cuda12.9"
 
   tasks:
   - name: Ensure apt supports https transport
@@ -43,7 +43,7 @@
   - name: Install core CUDA & compatibility packages
     apt:
       name:
-      - "cuda-toolkit-11-8={{ cuda_version }}"
+      - "cuda-toolkit-12-9={{ cuda_version }}"
       - "{{ cuda_compat_pkg }}"
       state: present
 
